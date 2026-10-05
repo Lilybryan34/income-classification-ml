@@ -12,10 +12,10 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 def knn_imputation(file_path):
     """
     Data Cleaning & KNN Imputation
-    This portion curates the data by filling in the missing values with 
-    the most likely value based on KNN. It also loads the data into the data structure.
+    Fills missing values using KNN imputer for numerical features
+    and mode imputation for categorical attributes.
     """
-    print(f"\n Starting KNN Imputation, oversampling, One-Hot Encoding with z-score scaling on {file_path}")
+    print(f"\n Starting KNN Imputation on {file_path}")
     
     COLUMN_NAMES = [
         'age', 'workclass', 'fnlwgt', 'education', 'education-num', 
@@ -23,7 +23,7 @@ def knn_imputation(file_path):
         'capital-gain', 'capital-loss', 'hours-per-week', 'native-country', 'income'
     ]
 
-    #Load Data
+    # Load Data
     df = pd.read_csv(
         file_path,
         header=None,
@@ -40,11 +40,11 @@ def knn_imputation(file_path):
     total_nans_raw = df.isnull().sum().sum()
     print(f"Total missing values found: {total_nans_raw}")
 
-    #Target (Income)
+    # Target (Income)
     df_target = df[['income']]
     df_features = df.drop('income', axis=1)
 
-    #Identify Column Types
+    # Identify Column Types
     cat_cols = df_features.select_dtypes(include=['object']).columns
     num_cols = df_features.select_dtypes(include=['int64', 'float64']).columns
 
@@ -59,14 +59,14 @@ def knn_imputation(file_path):
     # Fit and transform the data
     X_encoded = preprocessor.fit_transform(df_features)
     
-    #Run KNN Imputer
+    # Run KNN Imputer
     imputer = KNNImputer(n_neighbors=5)
     X_imputed = imputer.fit_transform(X_encoded)
 
-    #Reconstruct DataFrame 
+    # Reconstruct DataFrame 
     df_clean = df.copy()
     
-    # Extract just the numeric part of the imputed array (first len(num_cols) columns)
+    # Extract numeric part of imputed array
     X_imputed_num = X_imputed[:, :len(num_cols)]
     scaler = preprocessor.named_transformers_['num']
     X_restored_num = scaler.inverse_transform(X_imputed_num)
@@ -83,7 +83,6 @@ def oversampling(df):
     """
     Handle Class Imbalance using RandomOverSampler
     """
-   
     X = df.drop('income', axis=1)
     y = df['income']
     
@@ -100,11 +99,9 @@ def oversampling(df):
 def encoding_scaling(train_df, test_df=None):
     """
     Final Encoding and Scaling
-    - Fits on train data
-    - Transforms train data
-    - If test data exists, Transforms Test data using train scalers
+    - Fits scalers/encoders strictly on train data
+    - Transforms train and test data separately
     """
-   
     y_train = train_df['income']
     X_train = train_df.drop('income', axis=1)
     
@@ -153,13 +150,10 @@ def decision_tree(train_df, test_df=None):
 
     le = LabelEncoder()
     y_train_enc = le.fit_transform(y_train_full)
-    print(f"Target classes encoded: {le.classes_}")
 
     if test_df is not None:
         print("Using External Test File for evaluation.")
         X_train, y_train = X_train_full, y_train_enc
-        
-        # Prepare 
         X_test = test_df.drop('income', axis=1)
         y_test = le.transform(test_df['income']) 
     else:
@@ -169,13 +163,11 @@ def decision_tree(train_df, test_df=None):
     print(f"Training set size: {X_train.shape[0]}")
     print(f"Test set size: {X_test.shape[0]}")
 
-    # Train
     clf = DecisionTreeClassifier(random_state=50)
     clf.fit(X_train, y_train)
 
     y_pred = clf.predict(X_test)
 
-    #Eval
     acc = accuracy_score(y_test, y_pred)
     print(f"\nModel Accuracy: {acc:.4f}")
     print("\nClassification Report:")
@@ -191,17 +183,12 @@ def logistic_regression(train_df, test_df=None):
     """
     print("\nMethod 2: Manual Logistic Regression (Gradient Descent)")
     
-    # Prepare Train
     X_train_full = train_df.drop("income", axis=1)
     y_train_full = train_df["income"]
 
-    # Map Target consistently
     unique_vals = y_train_full.unique()
-    
-    #Sort to ensure 0 is first alphabetically or consistently
     unique_vals.sort()
     mapping = {unique_vals[0]: 0, unique_vals[1]: 1}
-    print(f"Mapping target values: {mapping}")
     
     y_train_mapped = y_train_full.map(mapping)
     X_train_dummies = pd.get_dummies(X_train_full) 
@@ -247,67 +234,6 @@ def logistic_regression(train_df, test_df=None):
     accuracy = np.mean(test_predictions == y_test)
     print(f"\nLogistic Regression Accuracy: {accuracy * 100:.2f}%")
     print("Logistics Complete.")
-    
-    #FOR REVIEWER: If you would like to generate the figures and plots, as displayed in our presentation and report - uncomment the following code and run as needed
-    #these are all plots as presented in finalized work
-    #Get probability predictions for visualization
-    #test_predictions_proba = sigmoid(np.dot(X_test, weights) + bias)
-
-    # Create figure with 2 subplots for model eval.
-    #fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-    #Sigmoid S-Curve
-    #ax1 = axes[0]
-    #z_range = np.linspace(-10, 10, 100)
-    #sigmoid_values = sigmoid(z_range)
-    #ax1.plot(z_range, sigmoid_values, 'b-', linewidth=2)
-    #ax1.axhline(y=0.5, color='r', linestyle='--', label='Decision Boundary (0.5)')
-    #ax1.axvline(x=0, color='gray', linestyle='--', alpha=0.5)
-    #ax1.grid(True, alpha=0.3)
-    #ax1.set_xlabel('z (weighted sum)', fontsize=11)
-    #ax1.set_ylabel('Probability', fontsize=11)
-    #ax1.set_title('Sigmoid Function (S-Curve)', fontsize=12, fontweight='bold')
-    #ax1.legend()
-
-    #Model Performance Metrics (box)
-    #ax2 = axes[1]
-    #ax2.axis('off')
-
-    #Calculate metrics
-    #true_pos = np.sum((test_predictions == 1) & (y_test == 1))
-    #true_neg = np.sum((test_predictions == 0) & (y_test == 0))
-    #false_pos = np.sum((test_predictions == 1) & (y_test == 0))
-    #false_neg = np.sum((test_predictions == 0) & (y_test == 1))
-
-    #Calculate metrics
-    #precision = true_pos / (true_pos + false_pos) if (true_pos + false_pos) > 0 else 0
-    #recall = true_pos / (true_pos + false_neg) if (true_pos + false_neg) > 0 else 0
-    #f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-
-    #metrics_text = f"""
-    #Model Performance Metrics
-    
-    #Accuracy: {accuracy * 100:.2f}%
-
-    #Precision: {precision * 100:.2f}%
-
-    #Recall: {recall * 100:.2f}%
-
-    #F1-Score: {f1_score * 100:.2f}%
-
-    #True Positives: {true_pos}
-    #True Negatives: {true_neg}
-    #False Positives: {false_pos}
-    #False Negatives: {false_neg}
-    
-
-    #ax2.text(0.5, 0.5, metrics_text, ha='center', va='center', 
-    #     fontsize=12, family='monospace',
-    #    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-
-    #plt.tight_layout()
-    #plt.savefig('logistic_regression_visualizations.png', dpi=300, bbox_inches='tight')
-    #plt.show()
 
 def knn_classification(train_df, test_df=None):
     """
@@ -335,45 +261,7 @@ def knn_classification(train_df, test_df=None):
     print("\nClassification Report:\n")
     print(classification_report(y_test, y_pred))
     print("KNN Complete.")
-    #FOR REVIEWER: If you would like to generate the figures and plots, as displayed in our presentation and report - uncomment the following code and run as needed
-    #these are all KNN plot as presented in finalized work
 
-    #INCOME DISTRIBUTION
-    # df["income"].value_counts().plot(kind="bar")
-    # plt.title("Income Class Distribution")
-    # plt.xlabel("Income Class")
-    # plt.ylabel("Count")
-    # plt.show()
-    #
-    #FEATURE DISTRIBUTION
-    # df.hist(figsize=(12, 10))
-    # plt.suptitle("Attribute Distributions")
-    # plt.show()
-
-    #CONFUSION MATRIX
-    # from sklearn.metrics import ConfusionMatrixDisplay
-    # display = ConfusionMatrixDisplay.from_predictions(
-    #     y_test, y_pred, cmap="Blues")
-    # plt.title("KNN Confusion Matrix")
-    # plt.show()
-
-
-    #ACCURACY V. K
-    # k_values = range(1, 10)
-    # accuracies = []
-    #
-    # for k in k_values:
-    #     knn = KNeighborsClassifier(n_neighbors=k)
-    #     knn.fit(X_train, y_train)
-    #     y_pred_k = knn.predict(X_test)
-    #     accuracies.append(accuracy_score(y_test, y_pred_k))
-    #
-    # plt.plot(k_values, accuracies)
-    # plt.xlabel("Number of Neighbors")
-    # plt.ylabel("Accuracy")
-    # plt.title("Model Accuracy vs K")
-    # plt.show()
-    
 def weighted_ensemble(train_df, test_df=None):
     """
     Weighted Ensemble Model
@@ -398,17 +286,14 @@ def weighted_ensemble(train_df, test_df=None):
     print(f"Ensemble Training Set: {X_train.shape[0]}")
     print(f"Ensemble Test Set: {X_test.shape[0]}")
 
-    #DT
     clf = DecisionTreeClassifier(random_state=50)
     clf.fit(X_train, y_train)
     prob_dt = clf.predict_proba(X_test)[:, 1]
 
-    #KNN
     knn = KNeighborsClassifier(n_neighbors=5, metric="minkowski", p=2)
     knn.fit(X_train, y_train)
     prob_knn = knn.predict_proba(X_test)[:, 1]
 
-    #Manual LR
     X_train_np = X_train.values
     X_test_np = X_test.values
     y_train_np = y_train
@@ -430,7 +315,6 @@ def weighted_ensemble(train_df, test_df=None):
     
     prob_lr = sigmoid(np.dot(X_test_np, weights) + bias)
 
-    # Combine
     w_dt = 0.32
     w_lr = 0.33
     w_knn = 0.35
@@ -450,35 +334,52 @@ def weighted_ensemble(train_df, test_df=None):
 if __name__ == "__main__":
     TRAIN_INPUT_FILE = 'census-income.data.csv'
     
-    # Set this to 'census-income.test.csv' (or your filename) to use external testing
-    # Set to None to use the original 80/20 split on the training file
-    #TEST_INPUT_FILE = None 
+    # Set to 'census-income.test.csv' to use external testing
+    # Set to None to use an internal 80/20 split safely without data leakage
     TEST_INPUT_FILE = 'census-income.test.csv'
+    # TEST_INPUT_FILE = None 
 
     FINAL_OUTPUT_FILE = 'final-train.csv'
 
     try:
-        #Load & Preprocess TRAIN
+        print(f"\nLoading and cleaning Training Data: {TRAIN_INPUT_FILE}")
         train_clean = knn_imputation(TRAIN_INPUT_FILE)
-        train_balanced = oversampling(train_clean)
         
-        #Load & Preprocess TEST
         test_processed = None
+        
         if TEST_INPUT_FILE:
+            # Case A: External Test File provided
             print(f"\nProcessing External Test File: {TEST_INPUT_FILE}")
             test_clean = knn_imputation(TEST_INPUT_FILE)
+            
+            # Oversample ONLY the full training dataset before scaling
+            train_balanced = oversampling(train_clean)
+            
+            # Scale and encode train and test separately
             final_train_df, final_test_df = encoding_scaling(train_balanced, test_clean)
             test_processed = final_test_df
+            
         else:
-            final_train_df, _ = encoding_scaling(train_balanced, None)
+            # Case B: Internal Split Mode (No external test file)
+            print("\nUsing Internal 80/20 Split Mode (Splitting BEFORE oversampling/scaling)")
+            
+            # 1. Split raw cleaned data first to prevent data leakage
+            train_raw, val_raw = train_test_split(
+                train_clean, test_size=0.2, random_state=50, stratify=train_clean['income']
+            )
+            
+            # 2. Oversample ONLY the training split
+            train_balanced = oversampling(train_raw)
+            
+            # 3. Scale and encode using training-fitted transformers on validation data
+            final_train_df, final_val_df = encoding_scaling(train_balanced, val_raw)
+            test_processed = final_val_df  # Pass validation set as test set to models
 
-        #Save Final Result - Training set
+        # Save Final Result - Training set
         final_train_df.to_csv(FINAL_OUTPUT_FILE, index=False)
         print(f"\nFinal training dataset saved to: {FINAL_OUTPUT_FILE}")
-        print(f"\nTraining and Test (if provided) dataset have been curated. Oversampling not run on TEST: {FINAL_OUTPUT_FILE}")
         
         # Run Models
-        # Pass the processed test df (if it exists) to all models
         decision_tree(final_train_df, test_processed)
         logistic_regression(final_train_df.copy(), test_processed) 
         knn_classification(final_train_df.copy(), test_processed)
