@@ -1,5 +1,4 @@
 
-```markdown
 # Income Classification Using Machine Learning
 
 Predicts whether an individual earns more than $50,000 annually using demographic and socioeconomic attributes (such as age, education level, occupation, marital status, and weekly working hours) from the UCI Census Income (Adult) dataset.
